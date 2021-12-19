@@ -5,3 +5,7 @@ type HTTPHeaderField struct {
 	value string
 	next  *HTTPHeaderField
 }
+
+func NewHTTPHeaderField(name string, value string) *HTTPHeaderField {
+	return &HTTPHeaderField{name: name, value: value}
+}
