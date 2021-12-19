@@ -46,7 +46,13 @@ func (s *Service) readRequest() (*HTTPRequest, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%#v\n", req.header)
+	req.length, err = req.ContentLength()
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("%#v\n", req)
 
 	return req, nil
 }
@@ -64,4 +70,32 @@ func (s *Service) readRequestLine() (*HTTPRequest, error) {
 	}
 
 	return NewHTTPRequest(reqLineSplitted[0], reqLineSplitted[1], reqLineSplitted[2])
+}
+
+// 2行目の空白行をスキップして、リクエストヘッダーを読み込む
+func (s *Service) readHeaderField(req *HTTPRequest) error {
+	if !s.scanner.Scan() {
+		return errors.New("error while scanning empty 2nd line")
+	}
+
+	header := new(HTTPHeaderField)
+	for s.scanner.Scan() {
+		line := s.scanner.Text()
+
+		if line == "" {
+			break
+		}
+
+		h := strings.Split(line, ":")
+		if len(h) != 2 {
+			return errors.New("header field is invalid")
+		}
+
+		header.name = h[0]
+		header.value = h[1]
+		header.next = req.header
+		req.header = header
+	}
+
+	return nil
 }

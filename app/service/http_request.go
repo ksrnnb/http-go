@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -37,4 +38,27 @@ func NewHTTPRequest(method string, path string, protocol string) (*HTTPRequest, 
 	}
 
 	return &HTTPRequest{method: method, path: path, protocolMinorVersion: minorVersionInt}, nil
+}
+
+func (req *HTTPRequest) ContentLength() (length int, err error) {
+	value, err := req.FindHeaderFieldValue("Content-Length")
+
+	if err != nil {
+		return 0, err
+	}
+	trimemdValue := strings.Trim(value, " ")
+	return strconv.Atoi(trimemdValue)
+}
+
+func (req *HTTPRequest) FindHeaderFieldValue(field string) (value string, err error) {
+	header := req.header
+	for header != nil {
+		if header.name == field {
+			return header.value, nil
+		}
+
+		header = header.next
+	}
+
+	return "", fmt.Errorf("%s field is not found", field)
 }
