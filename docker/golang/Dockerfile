@@ -10,4 +10,4 @@ RUN apk update && \
 
 WORKDIR /go/src
 
-CMD ["air"]
+# CMD ["air"]
