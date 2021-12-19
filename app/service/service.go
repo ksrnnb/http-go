@@ -52,6 +52,12 @@ func (s *Service) readRequest() (*HTTPRequest, error) {
 		return nil, err
 	}
 
+	err = s.readRequestBody(req)
+
+	if err != nil {
+		return nil, err
+	}
+
 	fmt.Printf("%#v\n", req)
 
 	return req, nil
@@ -74,8 +80,9 @@ func (s *Service) readRequestLine() (*HTTPRequest, error) {
 
 // 2行目の空白行をスキップして、リクエストヘッダーを読み込む
 func (s *Service) readHeaderField(req *HTTPRequest) error {
+	// ヘッダーがなければなにもしない
 	if !s.scanner.Scan() {
-		return errors.New("error while scanning empty 2nd line")
+		return nil
 	}
 
 	header := new(HTTPHeaderField)
@@ -97,5 +104,29 @@ func (s *Service) readHeaderField(req *HTTPRequest) error {
 		req.header = header
 	}
 
+	return nil
+}
+
+// リクエストボディの読み込み
+// 最大でContent-Lengthまで
+func (s *Service) readRequestBody(req *HTTPRequest) error {
+	// ヘッダとボディの間の空行
+	// なければ何もしない
+	if req.length == 0 {
+		return nil
+	}
+
+	var body string
+
+	// 無限ループになっている。どこかで停止させる必要がある
+	for s.scanner.Scan() {
+		body += s.scanner.Text()
+	}
+
+	if len(body) < req.length {
+		return nil
+	}
+
+	req.body = body[:req.length]
 	return nil
 }

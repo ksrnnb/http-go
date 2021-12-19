@@ -18,7 +18,14 @@ func main() {
 
 	docroot := cfg.Section("").Key("DOCUMENT_ROOT").String()
 
-	service := service.NewService(os.Stdin, os.Stdout, docroot)
+	f, err := os.Open("test.txt")
+
+	if err != nil {
+		fmt.Printf("Fail to read file: %v\n", err)
+		os.Exit(1)
+	}
+
+	service := service.NewService(f, os.Stdout, docroot)
 	err = service.Start()
 
 	if err != nil {
