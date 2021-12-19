@@ -24,6 +24,7 @@ func main() {
 		fmt.Printf("Fail to read file: %v\n", err)
 		os.Exit(1)
 	}
+	defer f.Close()
 
 	service := service.NewService(f, os.Stdout, docroot)
 	err = service.Start()
