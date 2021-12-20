@@ -20,13 +20,6 @@ type HTTPRequest struct {
 
 func NewHTTPRequest(method string, path string, protocol string) (*HTTPRequest, error) {
 	method = strings.ToUpper(method)
-	switch method {
-	case "GET":
-		break
-	default:
-		return nil, errors.New("method is invalid")
-	}
-
 	protocolSplitted := strings.Split(protocol, "HTTP/1.")
 
 	if len(protocolSplitted) != 2 {

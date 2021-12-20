@@ -4,8 +4,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
+)
+
+const (
+	httpMinorVersion = 0
+	serverVersion    = "1.0"
+	serverName       = "MyHTTPServer"
 )
 
 type Service struct {
@@ -22,15 +30,13 @@ func NewService(in *os.File, out *os.File, docroot string) *Service {
 }
 
 func (s *Service) Start() error {
-	_, err := s.readRequest()
+	req, err := s.readRequest()
 
 	if err != nil {
 		return err
 	}
 
-	return nil
-
-	// s.respondTo(req)
+	return s.writeResponse(req)
 }
 
 func (s *Service) readRequest() (*HTTPRequest, error) {
@@ -58,8 +64,6 @@ func (s *Service) readRequest() (*HTTPRequest, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%#v\n", req)
-
 	return req, nil
 }
 
@@ -78,13 +82,8 @@ func (s *Service) readRequestLine() (*HTTPRequest, error) {
 	return NewHTTPRequest(reqLineSplitted[0], reqLineSplitted[1], reqLineSplitted[2])
 }
 
-// 2行目の空白行をスキップして、リクエストヘッダーを読み込む
+// リクエストヘッダーを読み込む
 func (s *Service) readHeaderField(req *HTTPRequest) error {
-	// ヘッダーがなければなにもしない
-	if !s.scanner.Scan() {
-		return nil
-	}
-
 	header := new(HTTPHeaderField)
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
@@ -118,7 +117,6 @@ func (s *Service) readRequestBody(req *HTTPRequest) error {
 
 	var body string
 
-	// 無限ループになっている。どこかで停止させる必要がある
 	for s.scanner.Scan() {
 		body += s.scanner.Text()
 	}
@@ -129,4 +127,118 @@ func (s *Service) readRequestBody(req *HTTPRequest) error {
 
 	req.body = body[:req.length]
 	return nil
+}
+
+// レスポンスを出力に書き込む
+func (s *Service) writeResponse(req *HTTPRequest) error {
+	fileInfo, err := NewFileInfo(s.docroot, req.path)
+
+	if err != nil {
+		// todo: log
+		return err
+	}
+
+	if !fileInfo.isOk {
+		return s.writeNotFound(req, fileInfo)
+	}
+	if req.method == "GET" {
+		return s.writeOkResponse(req, fileInfo)
+	}
+
+	if req.method == "POST" {
+		return s.writeNotAllowedResponse(req)
+	}
+
+	return s.writeNotImplementedResponse(req)
+}
+
+func (s *Service) writeStatusLine(status string) {
+	fmt.Fprintf(s.out, "HTTP/1.%d %s\r\n", httpMinorVersion, status)
+}
+
+func (s *Service) writeCommonHeaderFields(fileInfo *FileInfo) {
+	t := time.Now().Format("Mon, 2 Jan 2006 15:04:05 GMT")
+	fmt.Fprintf(s.out, "Date: %s\r\n", t)
+	fmt.Fprintf(s.out, "Server: %s/%s\r\n", serverName, serverVersion)
+	fmt.Fprintf(s.out, "Connection: close\r\n")
+}
+
+func (s *Service) writeOkResponse(req *HTTPRequest, fileInfo *FileInfo) error {
+	s.writeStatusLine("200 OK")
+	s.writeCommonHeaderFields(fileInfo)
+	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
+	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
+	fmt.Fprintf(s.out, "\r\n")
+
+	if req.method == "GET" {
+		s.writeResponseBody(fileInfo)
+	}
+
+	return nil
+}
+
+func (s *Service) writeNotFound(req *HTTPRequest, fileInfo *FileInfo) error {
+	s.writeStatusLine("404 Not Found")
+	s.writeCommonHeaderFields(fileInfo)
+	fmt.Fprintf(s.out, "\r\n")
+
+	return nil
+}
+
+func (s *Service) writeNotAllowedResponse(req *HTTPRequest) error {
+	fileInfo, err := NewFileInfo(s.docroot, "405.html")
+
+	if err != nil {
+		return err
+	}
+
+	if !fileInfo.isOk {
+		return errors.New("file not found")
+	}
+
+	s.writeStatusLine("405 Method Not Allowed")
+	s.writeCommonHeaderFields(fileInfo)
+	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
+	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
+	fmt.Fprintf(s.out, "\r\n")
+
+	s.writeResponseBody(fileInfo)
+	return nil
+}
+
+func (s *Service) writeNotImplementedResponse(req *HTTPRequest) error {
+	fileInfo, err := NewFileInfo(s.docroot, "501.html")
+
+	if err != nil {
+		return err
+	}
+
+	if !fileInfo.isOk {
+		return errors.New("file not found")
+	}
+
+	s.writeStatusLine("501 Not Implemeted")
+	s.writeCommonHeaderFields(fileInfo)
+	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
+	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
+	fmt.Fprintf(s.out, "\r\n")
+
+	s.writeResponseBody(fileInfo)
+
+	return nil
+}
+
+func (s *Service) writeResponseBody(fileInfo *FileInfo) error {
+	file, err := os.Open(fileInfo.path)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	_, err = io.Copy(s.out, file)
+	fmt.Fprintf(s.out, "\r\n")
+
+	return err
 }
