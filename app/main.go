@@ -17,6 +17,12 @@ func main() {
 	}
 
 	docroot := cfg.Section("").Key("DOCUMENT_ROOT").String()
+	port, err := cfg.Section("").Key("PORT").Int()
+
+	if err != nil {
+		fmt.Printf("Port number is invalid: %v\n", err)
+		os.Exit(1)
+	}
 
 	f, err := os.Open("test.txt")
 
@@ -25,6 +31,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer f.Close()
+
+	_, err = service.ListenSocket(port)
+	if err != nil {
+		fmt.Printf("Fail to listen socket: %v\n", err)
+		os.Exit(1)
+	}
 
 	service := service.NewService(f, os.Stdout, docroot)
 	err = service.Start()
