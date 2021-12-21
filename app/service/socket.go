@@ -16,9 +16,11 @@ func ListenSocket(port int) (socket int, err error) {
 		return -1, err
 	}
 
-	defer syscall.Close(socket)
-
 	sockAddr, err := sockAddr(port)
+
+	if err != nil {
+		return -1, err
+	}
 
 	err = syscall.Bind(socket, sockAddr)
 

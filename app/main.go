@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/ksrnnb/http-go/service"
 	"gopkg.in/ini.v1"
@@ -32,11 +33,13 @@ func main() {
 	}
 	defer f.Close()
 
-	_, err = service.ListenSocket(port)
+	socket, err := service.ListenSocket(port)
 	if err != nil {
 		fmt.Printf("Fail to listen socket: %v\n", err)
 		os.Exit(1)
 	}
+
+	defer syscall.Close(socket)
 
 	service := service.NewService(f, os.Stdout, docroot)
 	err = service.Start()
