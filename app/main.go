@@ -44,25 +44,20 @@ func main() {
 
 	ch := make(chan os.Signal, 1)
 
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(ch, os.Interrupt)
 
-	select {
-	case <-ch:
-		syscall.Close(socket)
-		os.Exit(1)
-	default:
-		accept(socket, docroot)
-	}
-	// for {
-	// 	nfd, _, err := syscall.Accept(socket)
+	// ctrl + c で中断した場合にsocketをcloseする
+	go func() {
+		for sig := range ch {
+			fmt.Println(sig)
+			close(ch)
 
-	// 	if err != nil {
-	// 		fmt.Printf("Fail to accept socket: %v\n", err)
-	// 		os.Exit(1)
-	// 	}
+			syscall.Close(socket)
+			os.Exit(1)
+		}
+	}()
 
-	// 	go startService(nfd, docroot)
-	// }
+	accept(socket, docroot)
 }
 
 func accept(socket int, docroot string) {
