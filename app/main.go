@@ -75,6 +75,8 @@ func accept(socket int, docroot string) {
 
 func startService(nfd int, docroot string) {
 	sock := os.NewFile(uintptr(nfd), "socket")
+	defer sock.Close()
+
 	service := service.NewService(sock, sock, docroot)
 	err := service.Start()
 
