@@ -84,7 +84,6 @@ func (s *Service) readRequestLine() (*HTTPRequest, error) {
 
 // リクエストヘッダーを読み込む
 func (s *Service) readHeaderField(req *HTTPRequest) error {
-	header := new(HTTPHeaderField)
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
 
@@ -93,12 +92,22 @@ func (s *Service) readHeaderField(req *HTTPRequest) error {
 		}
 
 		h := strings.Split(line, ":")
-		if len(h) != 2 {
+		if len(h) < 2 {
 			return errors.New("header field is invalid")
 		}
 
+		var value string
+		if len(h) > 2 {
+			for _, v := range h[1:] {
+				value += v
+			}
+		} else {
+			value = h[1]
+		}
+
+		header := new(HTTPHeaderField)
 		header.name = h[0]
-		header.value = h[1]
+		header.value = value
 		header.next = req.header
 		req.header = header
 	}
@@ -139,8 +148,9 @@ func (s *Service) writeResponse(req *HTTPRequest) error {
 	}
 
 	if !fileInfo.isOk {
-		return s.writeNotFound(req, fileInfo)
+		return s.writeNotFound(req)
 	}
+
 	if req.method == "GET" {
 		return s.writeOkResponse(req, fileInfo)
 	}
@@ -156,7 +166,7 @@ func (s *Service) writeStatusLine(status string) {
 	fmt.Fprintf(s.out, "HTTP/1.%d %s\r\n", httpMinorVersion, status)
 }
 
-func (s *Service) writeCommonHeaderFields(fileInfo *FileInfo) {
+func (s *Service) writeCommonHeaderFields() {
 	t := time.Now().Format("Mon, 2 Jan 2006 15:04:05 GMT")
 	fmt.Fprintf(s.out, "Date: %s\r\n", t)
 	fmt.Fprintf(s.out, "Server: %s/%s\r\n", serverName, serverVersion)
@@ -165,7 +175,7 @@ func (s *Service) writeCommonHeaderFields(fileInfo *FileInfo) {
 
 func (s *Service) writeOkResponse(req *HTTPRequest, fileInfo *FileInfo) error {
 	s.writeStatusLine("200 OK")
-	s.writeCommonHeaderFields(fileInfo)
+	s.writeCommonHeaderFields()
 	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
 	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
 	fmt.Fprintf(s.out, "\r\n")
@@ -177,10 +187,24 @@ func (s *Service) writeOkResponse(req *HTTPRequest, fileInfo *FileInfo) error {
 	return nil
 }
 
-func (s *Service) writeNotFound(req *HTTPRequest, fileInfo *FileInfo) error {
+func (s *Service) writeNotFound(req *HTTPRequest) error {
+	fileInfo, err := NewFileInfo(s.docroot, "404.html")
+
+	if err != nil {
+		return err
+	}
+
+	if !fileInfo.isOk {
+		return errors.New("file not found")
+	}
+
 	s.writeStatusLine("404 Not Found")
-	s.writeCommonHeaderFields(fileInfo)
+	s.writeCommonHeaderFields()
+	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
+	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
 	fmt.Fprintf(s.out, "\r\n")
+
+	s.writeResponseBody(fileInfo)
 
 	return nil
 }
@@ -197,7 +221,7 @@ func (s *Service) writeNotAllowedResponse(req *HTTPRequest) error {
 	}
 
 	s.writeStatusLine("405 Method Not Allowed")
-	s.writeCommonHeaderFields(fileInfo)
+	s.writeCommonHeaderFields()
 	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
 	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
 	fmt.Fprintf(s.out, "\r\n")
@@ -218,7 +242,7 @@ func (s *Service) writeNotImplementedResponse(req *HTTPRequest) error {
 	}
 
 	s.writeStatusLine("501 Not Implemeted")
-	s.writeCommonHeaderFields(fileInfo)
+	s.writeCommonHeaderFields()
 	fmt.Fprintf(s.out, "Content-Length: %d\r\n", fileInfo.size)
 	fmt.Fprintf(s.out, "Content-Type: %s\r\n", fileInfo.guessContentType())
 	fmt.Fprintf(s.out, "\r\n")

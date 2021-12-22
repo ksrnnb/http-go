@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -54,7 +53,7 @@ func (req *HTTPRequest) ContentLength() (length int, err error) {
 		return 0, errors.New("content length is invalid")
 	}
 
-	return length, err
+	return length, nil
 }
 
 func (req *HTTPRequest) FindHeaderFieldValue(field string) (value string, err error) {
@@ -67,5 +66,5 @@ func (req *HTTPRequest) FindHeaderFieldValue(field string) (value string, err er
 		header = header.next
 	}
 
-	return "", fmt.Errorf("%s field is not found", field)
+	return "0", nil
 }
