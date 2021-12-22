@@ -93,12 +93,21 @@ func (s *Service) readHeaderField(req *HTTPRequest) error {
 		}
 
 		h := strings.Split(line, ":")
-		if len(h) != 2 {
+		if len(h) < 2 {
 			return errors.New("header field is invalid")
 		}
 
+		var value string
+		if len(h) > 2 {
+			for _, v := range h[1:] {
+				value += v
+			}
+		} else {
+			value = h[1]
+		}
+
 		header.name = h[0]
-		header.value = h[1]
+		header.value = value
 		header.next = req.header
 		req.header = header
 	}
