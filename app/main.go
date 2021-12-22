@@ -19,6 +19,7 @@ func main() {
 	}
 
 	docroot := cfg.Section("").Key("DOCUMENT_ROOT").String()
+	env := cfg.Section("").Key("SERVER_ENV").String()
 	port, err := cfg.Section("").Key("PORT").Int()
 
 	if err != nil {
@@ -26,14 +27,33 @@ func main() {
 		os.Exit(1)
 	}
 
+	if env == "socket" {
+		doSocketService(port, docroot)
+	} else {
+		doFileService(docroot)
+	}
+}
+
+func doFileService(docroot string) {
 	f, err := os.Open("test.txt")
 
 	if err != nil {
 		fmt.Printf("Fail to read file: %v\n", err)
 		os.Exit(1)
 	}
-	defer f.Close()
 
+	service := service.NewService(f, os.Stdout, docroot)
+	err = service.Start()
+
+	if err != nil {
+		fmt.Printf("stdin, stdout error: %v\n", err)
+		os.Exit(1)
+	}
+
+	defer f.Close()
+}
+
+func doSocketService(port int, docroot string) {
 	socket, err := service.ListenSocket(port)
 	if err != nil {
 		fmt.Printf("Fail to listen socket: %v\n", err)
