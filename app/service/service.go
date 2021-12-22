@@ -84,7 +84,6 @@ func (s *Service) readRequestLine() (*HTTPRequest, error) {
 
 // リクエストヘッダーを読み込む
 func (s *Service) readHeaderField(req *HTTPRequest) error {
-	header := new(HTTPHeaderField)
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
 
@@ -106,6 +105,7 @@ func (s *Service) readHeaderField(req *HTTPRequest) error {
 			value = h[1]
 		}
 
+		header := new(HTTPHeaderField)
 		header.name = h[0]
 		header.value = value
 		header.next = req.header

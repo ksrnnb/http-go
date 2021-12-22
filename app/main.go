@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"syscall"
 
 	"github.com/ksrnnb/http-go/service"
@@ -41,11 +42,52 @@ func main() {
 
 	defer syscall.Close(socket)
 
-	service := service.NewService(f, os.Stdout, docroot)
-	err = service.Start()
+	ch := make(chan os.Signal, 1)
+
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+
+	select {
+	case <-ch:
+		syscall.Close(socket)
+		os.Exit(1)
+	default:
+		accept(socket, docroot)
+	}
+	// for {
+	// 	nfd, _, err := syscall.Accept(socket)
+
+	// 	if err != nil {
+	// 		fmt.Printf("Fail to accept socket: %v\n", err)
+	// 		os.Exit(1)
+	// 	}
+
+	// 	go startService(nfd, docroot)
+	// }
+}
+
+func accept(socket int, docroot string) {
+	for {
+		nfd, _, err := syscall.Accept(socket)
+
+		if err != nil {
+			fmt.Printf("Fail to accept socket: %v\n", err)
+			os.Exit(1)
+		}
+
+		go startService(nfd, docroot)
+	}
+}
+
+func startService(nfd int, docroot string) {
+	sock := os.NewFile(uintptr(nfd), "socket")
+	service := service.NewService(sock, sock, docroot)
+	err := service.Start()
 
 	if err != nil {
 		fmt.Printf("service error: %v\n", err)
+		syscall.Close(nfd)
 		os.Exit(1)
 	}
+
+	syscall.Close(nfd)
 }
